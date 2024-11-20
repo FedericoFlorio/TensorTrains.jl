@@ -2,7 +2,10 @@ module TensorTrains
 
 using KrylovKit: eigsolve
 using Lazy: @forward
-using LinearAlgebra: LinearAlgebra, svd, norm, tr, I, dot, normalize!, Diagonal
+using TensorCast: @cast, TensorCast
+using LinearAlgebra: svd, norm, tr, I, dot, normalize!, Diagonal
+using LinearAlgebra
+using OffsetArrays
 using LogarithmicNumbers: Logarithmic
 using MKL
 using MPSKit: InfiniteMPS, DenseMPO, VUMPS, approximate, dot, add_util_leg, site_type, physicalspace
@@ -17,12 +20,9 @@ import Optim
 export 
     getindex, iterate, firstindex, lastindex, setindex!, eachindex, length, show,
     SVDTrunc, TruncBond, TruncThresh, TruncBondMax, TruncBondThresh, summary_compact,
-    AbstractTensorTrain, TensorTrain, normalize_eachmatrix!, +, -, ==, isapprox, evaluate, 
-    nparams, is_in_domain,
-    bond_dims, flat_tt, rand_tt, orthogonalize_right!, orthogonalize_left!, orthogonalize_center!,
-    orthogonalize_two_site_center!,
-    compress!,
-    marginals, twovar_marginals, lognormalization, normalization, normalize!,
+    AbstractTensorTrain, BasisTensorTrain, TensorTrain, FourierTensorTrain, normalize_eachmatrix!, +, -, ==, isapprox, evaluate, 
+    bond_dims, flat_tt, flat_fourier_tt, rand_tt, rand_fourier_tt, orthogonalize_right!, orthogonalize_left!, compress!,
+    marginals, twovar_marginals, lognormalization, normalization, normalize!, 
     dot, norm, norm2m,
     sample!, sample,
     AbstractPeriodicTensorTrain, PeriodicTensorTrain, flat_periodic_tt, rand_periodic_tt,
@@ -46,12 +46,8 @@ include("tensor_train.jl")
 include("periodic_tensor_train.jl")
 include("dmrg.jl")
 
-# Uniform Tensor Trains
-include("UniformTensorTrains/uniform_tensor_train.jl")
-include("UniformTensorTrains/transfer_operator.jl")
-include("UniformTensorTrains/trunc_vumps.jl")
+include("basis_tensor_trains/basis_tensor_train.jl")
+include("basis_tensor_trains/fourier_tensor_train.jl")
 
-# Matrix Product States
-include("MatrixProductStates/MatrixProductStates.jl")
 
 end # end module
