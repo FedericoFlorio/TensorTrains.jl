@@ -15,12 +15,13 @@ using StatsBase
 export 
     getindex, iterate, firstindex, lastindex, setindex!, eachindex, length, show,
     SVDTrunc, TruncBond, TruncThresh, TruncBondMax, TruncBondThresh, summary_compact,
-    AbstractTensorTrain, BasisTensorTrain, TensorTrain, FourierTensorTrain, normalize_eachmatrix!, +, -, ==, isapprox, evaluate, 
-    bond_dims, flat_tt, flat_fourier_tt, rand_tt, rand_fourier_tt, orthogonalize_right!, orthogonalize_left!, compress!,
+    AbstractTensorTrain, TensorTrain, normalize_eachmatrix!, +, -, ==, isapprox, evaluate, 
+    bond_dims, flat_tt, rand_tt, orthogonalize_right!, orthogonalize_left!, compress!,
     marginals, twovar_marginals, lognormalization, normalization, normalize!, 
     dot, norm, norm2m,
     sample!, sample,
-    PeriodicTensorTrain, flat_periodic_tt, rand_periodic_tt
+    PeriodicTensorTrain, flat_periodic_tt, rand_periodic_tt,
+    BasisTensorTrain, FourierTensorTrain, flat_fourier_tt, rand_fourier_tt, FourierTensorTrain_spin, marginals_Fourier
 
 include("utils.jl")
 include("svd_trunc.jl")
