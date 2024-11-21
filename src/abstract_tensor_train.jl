@@ -129,7 +129,7 @@ end
 """
     normalize_eachmatrix!(A::AbstractTensorTrain)
 
-Divide each matrix by its maximum (absolute) element and return the sum of the logs of the individual normalizations.
+Divide each matrix by its maximum (absolute) element and update the `z` field of `A`.
 This is used to keep the entries from exploding during computations
 """
 function normalize_eachmatrix!(A::AbstractTensorTrain{F}) where F
