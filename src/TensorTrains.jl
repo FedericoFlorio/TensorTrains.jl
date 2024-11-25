@@ -21,7 +21,7 @@ export
     dot, norm, norm2m,
     sample!, sample,
     PeriodicTensorTrain, flat_periodic_tt, rand_periodic_tt,
-    BasisTensorTrain, FourierTensorTrain, flat_fourier_tt, rand_fourier_tt, FourierTensorTrain_spin, marginals_Fourier
+    BasisTensorTrain, FourierTensorTrain, flat_fourier_tt, rand_fourier_tt, orthogonalize_right, orthogonalize_left, compress, FourierTensorTrain_spin, marginals_Fourier
 
 include("utils.jl")
 include("svd_trunc.jl")

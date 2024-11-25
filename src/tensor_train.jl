@@ -5,20 +5,21 @@ A type for representing a Tensor Train
 - `F` is the type of the matrix entries
 - `N` is the number of indices of each tensor (2 virtual ones + `N-2` physical ones)
 """
-mutable struct TensorTrain{F<:Number, N} <: AbstractTensorTrain{F,N}
+mutable struct TensorTrain{F<:Number, N, F1} <: AbstractTensorTrain{F,N}
     tensors::Vector{Array{F,N}}
-    z::Logarithmic{F}
+    z::Logarithmic{F1}
 
-    function TensorTrain{F,N}(tensors::Vector{Array{F,N}}; z::Logarithmic{F}=Logarithmic(one(F))) where {F<:Number, N}
+    function TensorTrain{F,N}(tensors::Vector{Array{F,N}}; z::Logarithmic{F1}=Logarithmic(abs(one(F)))) where {F<:Number, N, F1}
         N > 2 || throw(ArgumentError("Tensors shold have at least 3 indices: 2 virtual and 1 physical"))
         size(tensors[1],1) == size(tensors[end],2) == 1 ||
             throw(ArgumentError("First matrix must have 1 row, last matrix must have 1 column"))
         check_bond_dims(tensors) ||
             throw(ArgumentError("Matrix indices for matrix product non compatible"))
-        return new{F,N}(tensors, z)
+        return new{F,N,F1}(tensors, z)
     end
 end
-function TensorTrain(tensors::Vector{Array{F,N}}; z::Logarithmic{F}=Logarithmic(one(F))) where {F<:Number, N} 
+function TensorTrain(tensors::Vector{Array{F,N}}; z=Logarithmic(abs(one(F)))) where 
+{F<:Number, N}
     return TensorTrain{F,N}(tensors; z)
 end
 
@@ -55,10 +56,10 @@ Construct a Tensor Train with entries random in [0,1], by specifying either:
 and
 - `q` a Tuple/Vector specifying the number of values taken by each variable on a single site
 """
-function rand_tt(bondsizes::AbstractVector{<:Integer}, q...)
-    TensorTrain([rand(bondsizes[t], bondsizes[t+1], q...) for t in 1:length(bondsizes)-1])
+function rand_tt(bondsizes::AbstractVector{<:Integer}, q...; rng=Random.default_rng())
+    TensorTrain([rand(rng, bondsizes[t], bondsizes[t+1], q...) for t in 1:length(bondsizes)-1])
 end
-rand_tt(d::Integer, L::Integer, q...) = rand_tt([1; fill(d, L-1); 1], q...)
+rand_tt(d::Integer, L::Integer, q...; kw...) = rand_tt([1; fill(d, L-1); 1], q...; kw...)
 
 
 """
@@ -73,7 +74,7 @@ function orthogonalize_right!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) wh
     q = size(Cᵀ, 3)
     @cast M[m, (n, x)] := Cᵀ[m, n, x]
     D = fill(1.0,1,1,1)
-    c = Logarithmic(one(F))
+    c = Logarithmic(abs(one(F)))
 
     for t in length(C):-1:2
         U, λ, V = svd_trunc(M)
@@ -103,12 +104,14 @@ Optionally perform truncations by passing a `SVDTrunc`.
 function orthogonalize_left!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) where F
     C⁰ = _reshape1(C[begin])
     q = size(C⁰, 3)
-    @cast M[(m, x), n] |= C⁰[m, n, x]
+    @cast M[(m, x), n] := C⁰[m, n, x]
     D = fill(1.0,1,1,1)
-    c = Logarithmic(one(F))
+    c = Logarithmic(abs(one(F)))
 
     for t in 1:length(C)-1
         U, λ, V = svd_trunc(M)
+        #println(" $q")
+        q = prod(size(C[t])[3:end])
         @cast Aᵗ[m, n, x] := U[(m, x), n] x ∈ 1:q
         C[t] = _reshapeas(Aᵗ, C[t])
         Cᵗ⁺¹ = _reshape1(C[t+1])
@@ -118,7 +121,7 @@ function orthogonalize_left!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) whe
             D ./= m
             c *= m
         end
-        @cast M[(m, x), n] |= D[m, n, x]
+        @cast M[(m, x), n] := D[m, n, x]
     end
     C[end] = _reshapeas(D, C[end])
     C.z /= c
