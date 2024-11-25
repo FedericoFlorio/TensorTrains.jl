@@ -12,7 +12,7 @@ function offset_fourier_freqs(tensors::Vector{Array{Complex{F},N}}) where {F<:Nu
             Aᵗ = OffsetArray(Aᵗ, newsize...)
         end
         return Aᵗ
-    end     
+    end
 end
 
 """
@@ -26,11 +26,13 @@ mutable struct FourierTensorTrain{F<:Number, N} <: BasisTensorTrain{F,N}
     tensors::Vector{OffsetArray{Complex{F}, N, Array{Complex{F}, N}}}
     z::Logarithmic{F}
 
-    function FourierTensorTrain{F,N}(tensors::Vector{OffsetArray{Complex{F}, N, Array{Complex{F}, N}}}, z::Logarithmic{F}) where {F<:Number, N}
+    function FourierTensorTrain{F,N}(tensors::Vector{OffsetArray{Complex{F}, N, Array{Complex{F}, N}}},
+        z::Logarithmic{F}) where {F<:Number, N}
         return new{F,N}(tensors, z)
     end
 end
-function FourierTensorTrain(tensors::Vector{Array{Complex{F},N}}; z::Logarithmic{F}=Logarithmic(one(F))) where {F<:Number, N}
+function FourierTensorTrain(tensors::Vector{Array{Complex{F},N}};
+    z=Logarithmic(one(F))) where {F<:Number, N}
     N > 2 || throw(ArgumentError("Tensors shold have at least 3 indices: 2 virtual and 1 physical"))
         size(tensors[1],1) == size(tensors[end],2) == 1 ||
             throw(ArgumentError("First matrix must have 1 row, last matrix must have 1 column"))
@@ -39,11 +41,14 @@ function FourierTensorTrain(tensors::Vector{Array{Complex{F},N}}; z::Logarithmic
     return FourierTensorTrain{F,N}(offset_fourier_freqs(tensors), z)
 end
 
-
 @forward FourierTensorTrain.tensors Base.getindex, Base.iterate, Base.firstindex, Base.lastindex,
     Base.setindex!, Base.length, Base.eachindex,  
     check_bond_dims
 
+
+function offset_fourier_freqs(A::FourierTensorTrain{F,N}) where {F<:Number, N}
+    return FourierTensorTrain(collect.(A.tensors), z=A.z)
+end
   
 """
     flat_fourier_tt(bondsizes::AbstractVector{<:Integer}, q...; imaginary=0.0)
@@ -80,67 +85,84 @@ rand_fourier_tt(d::Integer, L::Integer, q...) = rand_tt([1; fill(d, L-1); 1], q.
 
 
 """
-    orthogonalize_right!(A::AbstractTensorTrain; svd_trunc::SVDTrunc)
+    orthogonalize_right!(A::FourierTensorTrain; svd_trunc::SVDTrunc)
 
 Brings `A` to right-orthogonal form by means of SVD decompositions.
 
 Optionally performs truncations by passing a `SVDTrunc`.
 """
-function orthogonalize_right!(C::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
-    Cᵀ = _reshape1(C[end])
-    q = size(Cᵀ, 3)
-    @cast M[m, (n, x)] := Cᵀ[m, n, x]
-    D = fill(1.0,1,1,1)
-    c = Logarithmic(one(F))
+# function orthogonalize_right(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
+#     C = collect.(A.tensors)
+#     Cᵀ = _reshape1(C[end])
+#     q = size(Cᵀ, 3)
+#     @cast M[m, (n, x)] := Cᵀ[m, n, x]
+#     D = fill(1.0,1,1,1)
+#     c = Logarithmic(one(F))
 
-    for t in length(C):-1:2
-        U, λ, V = svd_trunc(M)
-        @cast Aᵗ[m, n, x] := V'[m, (n, x)] x ∈ 1:q
-        C[t] = _reshapeas(Aᵗ, C[t])     
-        Cᵗ⁻¹ = _reshape1(C[t-1])
-        @tullio D[m, n, x] := Cᵗ⁻¹[m, k, x] * U[k, n] * λ[n]
-        m = maximum(abs, D)
-        if !isnan(m) && !isinf(m) && !iszero(m)
-            D ./= m
-            c *= m
-        end
-        @cast M[m, (n, x)] := D[m, n, x]
-    end
-    C[begin] = _reshapeas(D, C[begin])
-    C.z /= c
-    return C
+#     for t in length(C):-1:2
+#         U, λ, V = svd_trunc(M)
+#         @cast Aᵗ[m, n, x] := V'[m, (n, x)] x ∈ 1:q
+#         C[t] = _reshapeas(Aᵗ, C[t])
+#         Cᵗ⁻¹ = _reshape1(C[t-1])
+#         @tullio D[m, n, x] := Cᵗ⁻¹[m, k, x] * U[k, n] * λ[n]
+#         m = maximum(abs, D)
+#         if !isnan(m) && !isinf(m) && !iszero(m)
+#             D ./= m
+#             c *= m
+#         end
+#         @cast M[m, (n, x)] := D[m, n, x]
+#     end
+#     C[begin] = _reshapeas(D, C[begin])
+#     A.z /= c
+#     return FourierTensorTrain(C, z=A.z)
+# end
+function orthogonalize_right!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
+    C = getproperty.(A.tensors, :parent) |> TensorTrain
+    orthogonalize_right!(C)
+    B = FourierTensorTrain(C.tensors, z = A.z*C.z)
+    A.tensors = B.tensors
+    A.z = B.z
+    return A
 end
 
 """
-    orthogonalize_left!(A::AbstractTensorTrain; svd_trunc::SVDTrunc)
+    orthogonalize_left!(A::FourierTensorTrain; svd_trunc::SVDTrunc)
 
 Brings `A` to left-orthogonal form by means of SVD decompositions.
 
 Optionally performs truncations by passing a `SVDTrunc`.
 """
-function orthogonalize_left!(C::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
-    C⁰ = _reshape1(C[begin])
-    q = size(C⁰, 3)
-    @cast M[(m, x), n] |= C⁰[m, n, x]
-    D = fill(1.0,1,1,1)
-    c = Logarithmic(one(F))
+function orthogonalize_left!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
+    C = getproperty.(A.tensors, :parent) |> TensorTrain
+    # for i in eachindex(A)
+    #     println("Axes of A[$i] = $(axes(A[i]))")
+    #     println("Axes of C[$i] = $(axes(C[i]))")
+    # end
+    orthogonalize_left!(C)
+    B = FourierTensorTrain(C.tensors, z = A.z*C.z)
+    A.tensors = B.tensors
+    A.z = B.z
+    return A
+end
 
-    for t in 1:length(C)-1
-        U, λ, V = svd_trunc(M)
-        @cast Aᵗ[m, n, x] := U[(m, x), n] x ∈ 1:q
-        C[t] = _reshapeas(Aᵗ, C[t])
-        Cᵗ⁺¹ = _reshape1(C[t+1])
-        @tullio D[m, n, x] := λ[m] * V'[m, l] * Cᵗ⁺¹[l, n, x]
-        m = maximum(abs, D)
-        if !isnan(m) && !isinf(m) && !iszero(m)
-            D ./= m
-            c *= m
-        end
-        @cast M[(m, x), n] |= D[m, n, x]
+"""
+    compress!(A::FourierTensorTrain{F,N}; svd_trunc::SVDTrunc)
+
+Compresses `A` by means of SVD decompositions + truncations
+"""
+function compress!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6),
+    is_orthogonal::Symbol=:none) where {F<:Number, N}
+    if is_orthogonal == :none
+        orthogonalize_right!(A; svd_trunc=TruncThresh(0.0))
+        orthogonalize_left!(A; svd_trunc)
+    elseif is_orthogonal == :left
+        orthogonalize_right!(A; svd_trunc)
+    elseif is_orthogonal == :right
+        orthogonalize_left!(A; svd_trunc)
+    else
+        throw(ArgumentError("Keyword `is_orthogonal` only supports: :none, :left, :right, got :$is_orthogonal"))
     end
-    C[end] = _reshapeas(D, C[end])
-    C.z /= c
-    return C
+    return A
 end
 
 
@@ -330,6 +352,9 @@ function marginals(A::FourierTensorTrain{F,N}, P::Float64) where {F<:Number,N}
     map(pF) do pFᵗ
         norm2 = sum(abs2,pFᵗ)/P
         pFᵗ ./= sqrt(norm2)
-        x -> sum(pFᵗ[n]*F_n(n,P)(x) for n in -K:K)
+        x -> sum(pFᵗ[n]*F_n(n,P)(x) for n in -K:K) |> real
     end
- end
+end
+function marginals(A::FourierTensorTrain{F,N}) where {F,N}
+    error("The period of the basis function must be specified")
+end

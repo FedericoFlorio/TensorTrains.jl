@@ -83,7 +83,7 @@ function orthogonalize_right!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) wh
     q = size(Cᵀ, 3)
     @cast M[m, (n, x)] := Cᵀ[m, n, x]
     D = fill(1.0,1,1,1)
-    c = Logarithmic(one(F))
+    c = Logarithmic(abs(one(F)))
 
     for t in length(C):-1:2
         U, λ, V = svd_trunc(M)
@@ -113,12 +113,14 @@ Optionally perform truncations by passing a `SVDTrunc`.
 function orthogonalize_left!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) where F
     C⁰ = _reshape1(C[begin])
     q = size(C⁰, 3)
-    @cast M[(m, x), n] |= C⁰[m, n, x]
+    @cast M[(m, x), n] := C⁰[m, n, x]
     D = fill(1.0,1,1,1)
-    c = Logarithmic(one(F))
+    c = Logarithmic(abs(one(F)))
 
     for t in 1:length(C)-1
         U, λ, V = svd_trunc(M)
+        #println(" $q")
+        q = prod(size(C[t])[3:end])
         @cast Aᵗ[m, n, x] := U[(m, x), n] x ∈ 1:q
         C[t] = _reshapeas(Aᵗ, C[t])
         Cᵗ⁺¹ = _reshape1(C[t+1])
@@ -128,7 +130,7 @@ function orthogonalize_left!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) whe
             D ./= m
             c *= m
         end
-        @cast M[(m, x), n] |= D[m, n, x]
+        @cast M[(m, x), n] := D[m, n, x]
     end
     C[end] = _reshapeas(D, C[end])
     C.z /= c
