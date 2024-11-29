@@ -5,9 +5,9 @@ A type for representing a Tensor Train
 - `F` is the type of the matrix entries
 - `N` is the number of indices of each tensor (2 virtual ones + `N-2` physical ones)
 """
-mutable struct TensorTrain{F<:Number, N, F1} <: AbstractTensorTrain{F,N}
+mutable struct TensorTrain{F<:Number, N} <: AbstractTensorTrain{F,N}
     tensors::Vector{Array{F,N}}
-    z::Logarithmic{F1}
+    z::Logarithmic{F1} where {F1}
 
     function TensorTrain{F,N}(tensors::Vector{Array{F,N}}; z::Logarithmic{F1}=Logarithmic(abs(one(F)))) where {F<:Number, N, F1}
         N > 2 || throw(ArgumentError("Tensors shold have at least 3 indices: 2 virtual and 1 physical"))
@@ -15,11 +15,11 @@ mutable struct TensorTrain{F<:Number, N, F1} <: AbstractTensorTrain{F,N}
             throw(ArgumentError("First matrix must have 1 row, last matrix must have 1 column"))
         check_bond_dims(tensors) ||
             throw(ArgumentError("Matrix indices for matrix product non compatible"))
-        return new{F,N,F1}(tensors, z)
+        return new{F,N}(tensors, z)
     end
 end
-function TensorTrain(tensors::Vector{Array{F,N}}; z=Logarithmic(abs(one(F)))) where 
-{F<:Number, N}
+function TensorTrain(tensors::Vector{Array{F,N}}; z::Logarithmic{F1}=Logarithmic(abs(one(F)))) where 
+{F<:Number, N, F1}
     return TensorTrain{F,N}(tensors; z)
 end
 
@@ -56,7 +56,7 @@ Construct a Tensor Train with entries random in [0,1], by specifying either:
 and
 - `q` a Tuple/Vector specifying the number of values taken by each variable on a single site
 """
-function rand_tt(bondsizes::AbstractVector{<:Integer}, q...; rng=Random.default_rng())
+function rand_tt(bondsizes::AbstractVector{<:Integer}, q...; rng=default_rng())
     TensorTrain([rand(rng, bondsizes[t], bondsizes[t+1], q...) for t in 1:length(bondsizes)-1])
 end
 rand_tt(d::Integer, L::Integer, q...; kw...) = rand_tt([1; fill(d, L-1); 1], q...; kw...)
@@ -70,16 +70,18 @@ Bring `A` to right-orthogonal form by means of SVD decompositions.
 Optionally perform truncations by passing a `SVDTrunc`.
 """
 function orthogonalize_right!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) where F
+    length(C)==1 && return C
     Cᵀ = _reshape1(C[end])
-    q = size(Cᵀ, 3)
     @cast M[m, (n, x)] := Cᵀ[m, n, x]
     D = fill(1.0,1,1,1)
     c = Logarithmic(abs(one(F)))
 
     for t in length(C):-1:2
         U, λ, V = svd_trunc(M)
+        q = prod(size(C[t])[3:end])
         @cast Aᵗ[m, n, x] := V'[m, (n, x)] x ∈ 1:q
-        C[t] = _reshapeas(Aᵗ, C[t])     
+        s = (size(Aᵗ,1), size(Aᵗ,2), size(C[t])[3:end]...)
+        C[t] = reshape(Aᵗ, s...)
         Cᵗ⁻¹ = _reshape1(C[t-1])
         @tullio D[m, n, x] := Cᵗ⁻¹[m, k, x] * U[k, n] * λ[n]
         m = maximum(abs, D)
@@ -89,7 +91,8 @@ function orthogonalize_right!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) wh
         end
         @cast M[m, (n, x)] := D[m, n, x]
     end
-    C[begin] = _reshapeas(D, C[begin])
+    s = (size(D,1), size(D,2), size(C[begin])[3:end]...)
+    C[begin] = reshape(D, s...)
     C.z /= c
     return C
 end
@@ -102,18 +105,18 @@ Bring `A` to left-orthogonal form by means of SVD decompositions.
 Optionally perform truncations by passing a `SVDTrunc`.
 """
 function orthogonalize_left!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) where F
+    length(C)==1 && return C
     C⁰ = _reshape1(C[begin])
-    q = size(C⁰, 3)
     @cast M[(m, x), n] := C⁰[m, n, x]
     D = fill(1.0,1,1,1)
     c = Logarithmic(abs(one(F)))
 
     for t in 1:length(C)-1
         U, λ, V = svd_trunc(M)
-        #println(" $q")
         q = prod(size(C[t])[3:end])
         @cast Aᵗ[m, n, x] := U[(m, x), n] x ∈ 1:q
-        C[t] = _reshapeas(Aᵗ, C[t])
+        s = (size(Aᵗ,1), size(Aᵗ,2), size(C[t])[3:end]...)
+        C[t] = reshape(Aᵗ, s...)
         Cᵗ⁺¹ = _reshape1(C[t+1])
         @tullio D[m, n, x] := λ[m] * V'[m, l] * Cᵗ⁺¹[l, n, x]
         m = maximum(abs, D)
@@ -123,7 +126,8 @@ function orthogonalize_left!(C::TensorTrain{F}; svd_trunc=TruncThresh(1e-6)) whe
         end
         @cast M[(m, x), n] := D[m, n, x]
     end
-    C[end] = _reshapeas(D, C[end])
+    s = (size(D,1), size(D,2), size(C[end])[3:end]...)
+    C[end] = reshape(D, s...)
     C.z /= c
     return C
 end

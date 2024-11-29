@@ -91,34 +91,9 @@ Brings `A` to right-orthogonal form by means of SVD decompositions.
 
 Optionally performs truncations by passing a `SVDTrunc`.
 """
-# function orthogonalize_right(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
-#     C = collect.(A.tensors)
-#     Cᵀ = _reshape1(C[end])
-#     q = size(Cᵀ, 3)
-#     @cast M[m, (n, x)] := Cᵀ[m, n, x]
-#     D = fill(1.0,1,1,1)
-#     c = Logarithmic(one(F))
-
-#     for t in length(C):-1:2
-#         U, λ, V = svd_trunc(M)
-#         @cast Aᵗ[m, n, x] := V'[m, (n, x)] x ∈ 1:q
-#         C[t] = _reshapeas(Aᵗ, C[t])
-#         Cᵗ⁻¹ = _reshape1(C[t-1])
-#         @tullio D[m, n, x] := Cᵗ⁻¹[m, k, x] * U[k, n] * λ[n]
-#         m = maximum(abs, D)
-#         if !isnan(m) && !isinf(m) && !iszero(m)
-#             D ./= m
-#             c *= m
-#         end
-#         @cast M[m, (n, x)] := D[m, n, x]
-#     end
-#     C[begin] = _reshapeas(D, C[begin])
-#     A.z /= c
-#     return FourierTensorTrain(C, z=A.z)
-# end
 function orthogonalize_right!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
     C = getproperty.(A.tensors, :parent) |> TensorTrain
-    orthogonalize_right!(C)
+    orthogonalize_right!(C; svd_trunc)
     B = FourierTensorTrain(C.tensors, z = A.z*C.z)
     A.tensors = B.tensors
     A.z = B.z
@@ -134,11 +109,7 @@ Optionally performs truncations by passing a `SVDTrunc`.
 """
 function orthogonalize_left!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
     C = getproperty.(A.tensors, :parent) |> TensorTrain
-    # for i in eachindex(A)
-    #     println("Axes of A[$i] = $(axes(A[i]))")
-    #     println("Axes of C[$i] = $(axes(C[i]))")
-    # end
-    orthogonalize_left!(C)
+    orthogonalize_left!(C; svd_trunc)
     B = FourierTensorTrain(C.tensors, z = A.z*C.z)
     A.tensors = B.tensors
     A.z = B.z
@@ -153,8 +124,8 @@ Compresses `A` by means of SVD decompositions + truncations
 function compress!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6),
     is_orthogonal::Symbol=:none) where {F<:Number, N}
     if is_orthogonal == :none
-        orthogonalize_right!(A; svd_trunc=TruncThresh(0.0))
-        orthogonalize_left!(A; svd_trunc)
+        orthogonalize_right!(A, svd_trunc=TruncThresh(0.0))
+        orthogonalize_left!(A, svd_trunc=svd_trunc)
     elseif is_orthogonal == :left
         orthogonalize_right!(A; svd_trunc)
     elseif is_orthogonal == :right
@@ -210,9 +181,7 @@ function FourierTensorTrain_spin(A::TensorTrain{U,N}, K::Int, d::Int, P::Float64
     
     for t in eachindex(A)
         Aᵗ, Fᵗ = A[t], F[t]
-        for m in axes(Aᵗ)[1], n in axes(Aᵗ)[2]
-            Fᵗ[m,n,:] = cos_kn .+ im.*(Aᵗ[m,n,1]-Aᵗ[m,n,2]).*sin_kn
-        end
+        @tullio Fᵗ[m,n,α] = (Aᵗ[m,n,1]+Aᵗ[m,n,2]) * cos_kn[α] + im * (Aᵗ[m,n,1]-Aᵗ[m,n,2]) * sin_kn[α]
     end
     
     FTT = FourierTensorTrain(F, z=A.z)
@@ -335,16 +304,7 @@ julia> myf(A)
  "abcd"
  ;
  """
- =#
-
-
-# function evaluate_Fourier(C::Vector{Complex{F}}, x::U, P::Float64; normalized::Bool=true) where {F<:Number, U<:Real}
-#     Fx = sum([C[n]*F_n(n,P)(x) for n in eachindex(F)])
-#     if normalized
-#         Fx /= (sum(abs2, C) / P)
-#     end
-#     return Fx |> real
-# end
+=#
 
 function marginals(A::FourierTensorTrain{F,N}, P::Float64) where {F<:Number,N}
     K = (size(A[begin])[3]-1)/2 |> Int

@@ -8,7 +8,7 @@ using LinearAlgebra
 using OffsetArrays
 using LogarithmicNumbers: Logarithmic
 using Tullio: @tullio
-using Random: AbstractRNG, GLOBAL_RNG
+using Random: AbstractRNG, GLOBAL_RNG, default_rng
 using StatsBase: sample!, sample
 using StatsBase
 
