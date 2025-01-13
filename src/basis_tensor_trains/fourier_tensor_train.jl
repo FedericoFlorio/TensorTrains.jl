@@ -2,14 +2,14 @@
 f_n(n::Int, P::Float64) = x -> exp(-im*2π/P*n*x)
 F_n(n::Int, P::Float64) = x -> exp(im*2π/P*n*x)
 
-function offset_fourier_freqs(tensors::Vector{Array{Complex{F},N}}) where {F<:Number, N}
+function offset_fourier_freqs(tensors::Vector{Array{Complex{F},N}}, ax::Vector{Int64}) where {F<:Number, N}
     A = map(tensors) do Aᵗ
-        for i in 3:N
+        for i in ax
             K = (size(Aᵗ)[i]-1)/2
             isinteger(K) ? K=Int(K) : throw(ArgumentError("Wrong dimension for axis of coefficients"))
-            oldsize = axes(Aᵗ)
-            newsize = [oldsize[begin:i-1]..., -K:K, oldsize[i+1:end]...]
-            Aᵗ = OffsetArray(Aᵗ, newsize...)
+            oldaxes = axes(Aᵗ)
+            newaxes = [oldaxes[begin:i-1]..., -K:K, oldaxes[i+1:end]...]
+            Aᵗ = OffsetArray(Aᵗ, newaxes...)
         end
         return Aᵗ
     end
@@ -22,23 +22,23 @@ A type for representing the approximation of a Matrix-product state in Fourier b
 - `F` is the type of the matrix entries (which are complex)
 - `N` is the number of indices of each tensor (2 virtual ones + `N-2` physical ones)
 """
-mutable struct FourierTensorTrain{F<:Number, N} <: BasisTensorTrain{F,N}
-    tensors::Vector{OffsetArray{Complex{F}, N, Array{Complex{F}, N}}}
-    z::Logarithmic{F}
+mutable struct FourierTensorTrain{F1<:Number, N} <: BasisTensorTrain{F1,N}
+    tensors::Vector{OffsetArray{Complex{F1}, N, Array{Complex{F1}, N}}}
+    z::Logarithmic{F2} where {F2<:Number}
 
-    function FourierTensorTrain{F,N}(tensors::Vector{OffsetArray{Complex{F}, N, Array{Complex{F}, N}}},
-        z::Logarithmic{F}) where {F<:Number, N}
-        return new{F,N}(tensors, z)
+    function FourierTensorTrain{F1,N}(tensors::Vector{OffsetArray{Complex{F1}, N, Array{Complex{F1}, N}}}; z::Logarithmic{F2}) where {F1<:Number, F2<:Number, N}
+        any(any(isnan, a) for a in tensors) && error("NaN in Fourier Tensor Train")
+        return new{F1,N}(tensors, z)
     end
 end
-function FourierTensorTrain(tensors::Vector{Array{Complex{F},N}};
-    z=Logarithmic(one(F))) where {F<:Number, N}
+function FourierTensorTrain(tensors::Vector{Array{Complex{F1},N}};
+    z=Logarithmic(one(F1)), ax::Vector{Int64}=[3]) where {F1<:Number, N}
     N > 2 || throw(ArgumentError("Tensors shold have at least 3 indices: 2 virtual and 1 physical"))
         size(tensors[1],1) == size(tensors[end],2) == 1 ||
             throw(ArgumentError("First matrix must have 1 row, last matrix must have 1 column"))
         check_bond_dims(tensors) ||
             throw(ArgumentError("Matrix indices for matrix product non compatible"))
-    return FourierTensorTrain{F,N}(offset_fourier_freqs(tensors), z)
+    return FourierTensorTrain{F1,N}(offset_fourier_freqs(tensors, ax); z)
 end
 
 @forward FourierTensorTrain.tensors Base.getindex, Base.iterate, Base.firstindex, Base.lastindex,
@@ -166,13 +166,13 @@ end
 
 Computes a Fourier tensor train starting from a Tensor Train A, in which each tensor has three axes. The third index ``x`` of each tensor (the physical one) is assumed to represent the values for a spin ``s``, with the convention ``x=1 ⟺ s=-1`` and ``x=2 ⟺ s=+1``.
 For the purpose of going to a continuous domain, each matrix ``Aᵗ[m,n,:]`` is approximated as a linear combination of gaussians with variance ``σ²``, centered in 1 and -1: ``Aᵗ[m,n,1] g(-1,σ²) + Aᵗ[m,n,2] g(1,σ²)``.
-The extra `scale` parameter provides the possibility to scale the domain of the spin (i.e. define a spin with values ±scale).
+The extra `d` parameter provides the possibility to scale the domain of the spin (i.e. define a spin with values ±1/d).
 """
-function FourierTensorTrain_spin(A::TensorTrain{U,N}, K::Int, d::Int, P::Float64, σ::Float64) where {U,N}
-    N!=3 && throw(ArgumentError("Tensors for spins must have three axes"))
+function FourierTensorTrain_spin(A::TensorTrain{U,N}, K::Int, d::Real, P::Real, σ::Real) where {U,N}
+    N<3 && throw(ArgumentError("Tensors must have at least three axes"))
     any(!=(2), [size(Aᵗ)[3] for Aᵗ in A]) && throw(ArgumentError("Third axis of tensors for spins must have dimension 2"))
 
-    F = [Array{Complex{U}}(undef,size(Aᵗ)[1], size(Aᵗ)[2], 2K+1) for Aᵗ in A]
+    F = [Array{Complex{U}}(undef,size(Aᵗ)[1], size(Aᵗ)[2], 2K+1, size(Aᵗ)[4:end]...) for Aᵗ in A]
 
     k = OffsetVector([2π/P*n for n in -K:K], -K:K)
     expon = OffsetVector([exp(-k[n]^2*σ^2)/P for n in -K:K], -K:K)
@@ -180,9 +180,12 @@ function FourierTensorTrain_spin(A::TensorTrain{U,N}, K::Int, d::Int, P::Float64
     sin_kn = [expon[n] * sin(k[n]/d) for n in -K:K]
     
     for t in eachindex(A)
-        Aᵗ, Fᵗ = A[t], F[t]
-        @tullio Fᵗ[m,n,α] = (Aᵗ[m,n,1]+Aᵗ[m,n,2]) * cos_kn[α] + im * (Aᵗ[m,n,1]-Aᵗ[m,n,2]) * sin_kn[α]
+        Aᵗ = reshape(A[t], size(A[t])[1:3]..., prod(size(A[t])[4:end]))
+        Fᵗ = reshape(F[t], size(F[t])[1:3]..., prod(size(F[t])[4:end]))
+        @tullio Fᵗ[m,n,α,x] := (Aᵗ[m,n,1,x]+Aᵗ[m,n,2,x]) * cos_kn[α] + im * (Aᵗ[m,n,1,x]-Aᵗ[m,n,2,x]) * sin_kn[α]
+        F[t] = reshape(Fᵗ, size(F[t])...)
     end
+
     
     FTT = FourierTensorTrain(F, z=A.z)
     normalize_eachmatrix!(FTT)
