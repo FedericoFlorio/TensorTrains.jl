@@ -168,22 +168,19 @@ Computes a Fourier tensor train starting from a Tensor Train A, in which each te
 For the purpose of going to a continuous domain, each matrix ``Aᵗ[m,n,:]`` is approximated as a linear combination of gaussians with variance ``σ²``, centered in 1 and -1: ``Aᵗ[m,n,1] g(-1,σ²) + Aᵗ[m,n,2] g(1,σ²)``.
 The extra `d` parameter provides the possibility to scale the domain of the spin (i.e. define a spin with values ±1/d).
 """
-function FourierTensorTrain_spin(A::TensorTrain{U,N}, K::Int, d::Real, P::Real, σ::Real) where {U,N}
+function FourierTensorTrain_spin(A::TensorTrain{U,N}, K::Int, scale::Real, P::Real, σ::Real) where {U,N}
     N<3 && throw(ArgumentError("Tensors must have at least three axes"))
     any(!=(2), [size(Aᵗ)[3] for Aᵗ in A]) && throw(ArgumentError("Third axis of tensors for spins must have dimension 2"))
 
-    F = [Array{Complex{U}}(undef,size(Aᵗ)[1], size(Aᵗ)[2], 2K+1, size(Aᵗ)[4:end]...) for Aᵗ in A]
-
-    k = OffsetVector([2π/P*n for n in -K:K], -K:K)
-    expon = OffsetVector([exp(-k[n]^2*σ^2)/P for n in -K:K], -K:K)
-    cos_kn = [expon[n] * cos(k[n]/d) for n in -K:K]
-    sin_kn = [expon[n] * sin(k[n]/d) for n in -K:K]
+    k = OffsetVector([2π/P*α for α in -K:K], -K:K)
+    expon = OffsetVector([exp(-k[α]^2*σ^2)/P for α in -K:K], -K:K)
+    cos_kn = [expon[α] * cos(k[α]/scale) for α in -K:K]
+    sin_kn = [expon[α] * sin(k[α]/scale) for α in -K:K]
     
-    for t in eachindex(A)
+    F = map(eachindex(A)) do t
         Aᵗ = reshape(A[t], size(A[t])[1:3]..., prod(size(A[t])[4:end]))
-        Fᵗ = reshape(F[t], size(F[t])[1:3]..., prod(size(F[t])[4:end]))
         @tullio Fᵗ[m,n,α,x] := (Aᵗ[m,n,1,x]+Aᵗ[m,n,2,x]) * cos_kn[α] + im * (Aᵗ[m,n,1,x]-Aᵗ[m,n,2,x]) * sin_kn[α]
-        F[t] = reshape(Fᵗ, size(F[t])...)
+        return reshape(Fᵗ, size(A[t])[1], size(A[t])[2], 2K+1, size(A[t])[4:end]...)
     end
 
     
