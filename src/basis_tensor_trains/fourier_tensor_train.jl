@@ -93,7 +93,6 @@ Optionally performs truncations by passing a `SVDTrunc`.
 """
 function orthogonalize_right!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
     C = TensorTrain((x->copy(x.parent)).(A.tensors))
-    # C = getproperty.(A.tensors, :parent) |> TensorTrain
     orthogonalize_right!(C; svd_trunc)
     B = FourierTensorTrain(C.tensors, z = A.z*C.z)
     A.tensors = B.tensors
@@ -110,7 +109,6 @@ Optionally performs truncations by passing a `SVDTrunc`.
 """
 function orthogonalize_left!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
     C = TensorTrain((x->copy(x.parent)).(A.tensors))
-    # C = getproperty.(A.tensors, :parent) |> TensorTrain
     orthogonalize_left!(C; svd_trunc)
     B = FourierTensorTrain(C.tensors, z = A.z*C.z)
     A.tensors = B.tensors
@@ -281,8 +279,8 @@ function marginals_Fourier(A::FourierTensorTrain{F,N};
     end
 end
 #=
-"""Why do we take r[t+1] and not r[T-t] in the original one?"""
-"""
+Why do we take r[t+1] and not r[T-t] in the original one?
+
 julia> function myf(A)
            Rt=""
            R = map(At for At in Iterators.reverse(A)) do A
@@ -304,8 +302,7 @@ julia> myf(A)
  "cd"
  "bcd"
  "abcd"
- ;
- """
+
 =#
 
 function marginals(A::FourierTensorTrain{F,N}, P::Float64) where {F<:Number,N}
