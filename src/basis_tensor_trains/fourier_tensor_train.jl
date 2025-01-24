@@ -81,7 +81,7 @@ and
 function rand_fourier_tt(bondsizes::AbstractVector{<:Integer}, q...)
     FourierTensorTrain([rand(ComplexF64, bondsizes[t], bondsizes[t+1], q...) for t in 1:length(bondsizes)-1])
 end
-rand_fourier_tt(d::Integer, L::Integer, q...) = rand_tt([1; fill(d, L-1); 1], q...)
+rand_fourier_tt(d::Integer, L::Integer, q...) = rand_fourier_tt([1; fill(d, L-1); 1], q...)
 
 
 """
@@ -92,7 +92,8 @@ Brings `A` to right-orthogonal form by means of SVD decompositions.
 Optionally performs truncations by passing a `SVDTrunc`.
 """
 function orthogonalize_right!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
-    C = getproperty.(A.tensors, :parent) |> TensorTrain
+    C = TensorTrain((x->copy(x.parent)).(A.tensors))
+    # C = getproperty.(A.tensors, :parent) |> TensorTrain
     orthogonalize_right!(C; svd_trunc)
     B = FourierTensorTrain(C.tensors, z = A.z*C.z)
     A.tensors = B.tensors
@@ -108,7 +109,8 @@ Brings `A` to left-orthogonal form by means of SVD decompositions.
 Optionally performs truncations by passing a `SVDTrunc`.
 """
 function orthogonalize_left!(A::FourierTensorTrain{F,N}; svd_trunc=TruncThresh(1e-6)) where {F,N}
-    C = getproperty.(A.tensors, :parent) |> TensorTrain
+    C = TensorTrain((x->copy(x.parent)).(A.tensors))
+    # C = getproperty.(A.tensors, :parent) |> TensorTrain
     orthogonalize_left!(C; svd_trunc)
     B = FourierTensorTrain(C.tensors, z = A.z*C.z)
     A.tensors = B.tensors
