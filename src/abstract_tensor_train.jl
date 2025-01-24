@@ -71,7 +71,7 @@ function accumulate_L(A::AbstractTensorTrain{F}; normalize=true) where {F}
         end
         Lt = Lt * At
     end
-    z *= tr(Lt)
+    z *= abs(tr(Lt))
     return L, z
 end
 
@@ -86,7 +86,7 @@ function accumulate_R(A::AbstractTensorTrain{F}; normalize=true) where {F}
         end
         Rt = At * Rt
     end |> reverse
-    z *= tr(Rt)
+    z *= abs(tr(Rt))
     return R, z
 end
 
@@ -154,7 +154,7 @@ Return the natural logarithm of the absolute normalization ``\\log|Z|``
 function LinearAlgebra.normalize!(A::AbstractTensorTrain)
     absZ = abs(accumulate_L(A)[2])
     L = length(A)
-    x = exp(1/L * log(absZ))
+    x = exp(1/L * log(absZ))    # absZ is Logarithmic, so we do not need to take the exp (x = absZ^(1/L))
     if x != 0
         for a in A
             a ./= x
@@ -175,7 +175,7 @@ Compute the marginal distributions ``p(x^l)`` at each site
 - `l = accumulate_L(A)[1]`, `r = accumulate_R(A)[1]` pre-computed partial normalizations
 """
 function marginals(A::AbstractTensorTrain{F,N};
-    l = accumulate_L(A)[1], r = accumulate_R(A)[1]) where {F<:Real,N}
+    l = accumulate_L(A)[1], r = accumulate_R(A)[1]) where {F<:Number,N}
 
     map(eachindex(A)) do t 
         Aᵗ = _reshape1(A[t])

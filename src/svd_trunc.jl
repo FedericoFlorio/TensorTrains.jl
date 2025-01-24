@@ -37,9 +37,9 @@ function (svd_trunc::TruncThresh)(M::AbstractMatrix)
     U, λ, V = svd(M)
     λ_norm = norm(λ)
     mprime = 1
-    s = last(λ)^2
+    s = abs(last(λ))^2
     for (k, λₖ) in Iterators.drop(Iterators.reverse(pairs(λ)),1)
-        s += λₖ ^ 2
+        s += abs(λₖ) ^ 2
         if s ≥ (λ_norm * svd_trunc.ε)^2
             mprime = k + 1
             break
