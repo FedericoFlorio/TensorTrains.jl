@@ -17,6 +17,9 @@ using Tullio: @tullio
 using Random: AbstractRNG, GLOBAL_RNG, default_rng
 using StatsBase: sample!, sample
 using StatsBase
+using Random: AbstractRNG, GLOBAL_RNG, default_rng
+using StatsBase: sample!, sample
+using StatsBase
 using OffsetArrays
 import Optim
 
@@ -25,6 +28,7 @@ export
     SVDTrunc, TruncBond, TruncThresh, TruncBondMax, TruncBondThresh, summary_compact,
     AbstractTensorTrain, TensorTrain, normalize_eachmatrix!, +, -, ==, isapprox, evaluate, 
     bond_dims, flat_tt, rand_tt, orthogonalize_right!, orthogonalize_left!, compress!,
+    marginals, twovar_marginals, lognormalization, normalization, normalize!, 
     marginals, twovar_marginals, lognormalization, normalization, normalize!, 
     dot, norm, norm2m,
     sample!, sample,
@@ -41,6 +45,9 @@ export
     # DMRG
     two_site_dmrg!
 
+    # Basis tensor trains
+    BasisTensorTrain, FourierTensorTrain, flat_fourier_tt, rand_fourier_tt, FourierTensorTrain_spin, marginals_Fourier
+    
     # Basis tensor trains
     BasisTensorTrain, FourierTensorTrain, flat_fourier_tt, rand_fourier_tt, FourierTensorTrain_spin, marginals_Fourier
     
