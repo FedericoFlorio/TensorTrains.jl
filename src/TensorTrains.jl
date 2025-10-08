@@ -43,23 +43,19 @@ export
     TruncVUMPS,
 
     # DMRG
-    two_site_dmrg!
+    two_site_dmrg!,
 
     # Basis tensor trains
     BasisTensorTrain, FourierTensorTrain, flat_fourier_tt, rand_fourier_tt, FourierTensorTrain_spin, marginals_Fourier
     
-    # Basis tensor trains
-    BasisTensorTrain, FourierTensorTrain, flat_fourier_tt, rand_fourier_tt, FourierTensorTrain_spin, marginals_Fourier
+    include("utils.jl")
+    include("svd_trunc.jl")
+    include("abstract_tensor_train.jl")
+    include("tensor_train.jl")
+    include("periodic_tensor_train.jl")
+    include("dmrg.jl")
     
-include("utils.jl")
-include("svd_trunc.jl")
-include("abstract_tensor_train.jl")
-include("tensor_train.jl")
-include("periodic_tensor_train.jl")
-include("dmrg.jl")
-
-include("basis_tensor_trains/basis_tensor_train.jl")
-include("basis_tensor_trains/fourier_tensor_train.jl")
-
+    include("basis_tensor_trains/basis_tensor_train.jl")
+    include("basis_tensor_trains/fourier_tensor_train.jl")
 
 end # end module

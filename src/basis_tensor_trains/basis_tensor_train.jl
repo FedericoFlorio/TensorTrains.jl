@@ -7,4 +7,4 @@ It currently supports the Fourier basis ``uₐ(x) = exp(2π/T a x)``.
 """
 abstract type BasisTensorTrain{F<:Number, N} <: AbstractTensorTrain{F,N} end
 
-Base.eltype(::BasisTensorTrain{F,N}) where {N,F} = F
+Base.eltype(::BasisTensorTrain{F,N}) where {F,N} = F
