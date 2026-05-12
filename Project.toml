@@ -1,7 +1,7 @@
 name = "TensorTrains"
 uuid = "89893e69-996d-40b1-ba32-8ff5f34c0dd5"
 authors = ["stecrotti <stefano.crotti@polito.it>", "abraunst <alfredo.braunstein@polito.it"]
-version = "0.13.0"
+version = "0.14.0"
 
 [deps]
 KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
@@ -23,7 +23,7 @@ KrylovKit = "0.6, 0.7, 0.8"
 Lazy = "0.15"
 LinearAlgebra = "1.8"
 LogarithmicNumbers = "1.4"
-MKL = "0.6.3, 0.7"
+MKL = "0.6.3, 0.7, 0.9"
 MPSKit = "0.11.5"
 OffsetArrays = "1.15.0"
 Optim = "1.11"
